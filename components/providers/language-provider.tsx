@@ -9,7 +9,8 @@ import {
   type ReactNode,
 } from "react"
 import type { Language } from "@/lib/i18n"
-import { t } from "@/lib/i18n"
+import { t, DEFAULT_LANGUAGE } from "@/lib/i18n"
+import { loadProfile, saveProfile } from "@/lib/profile"
 
 const STORAGE_KEY = "echomail-language"
 
@@ -22,25 +23,33 @@ type LangContextType = {
 const LangContext = createContext<LangContextType | null>(null)
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguageState] = useState<Language>("ca" as Language)
+  const [language, setLanguageState] = useState<Language>(DEFAULT_LANGUAGE)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY)
+      const profile = loadProfile()
       const valid: Language[] = ["ca", "pt", "es", "es-LA", "en-US", "en-GB", "fr", "de", "zh-CN", "zh-TW", "ja"]
       const migration: Record<string, Language> = {
         en: "en-US",
         fr: "fr",
         de: "de",
       }
+      // Prioridad: 1) localStorage, 2) perfil, 3) DEFAULT_LANGUAGE (es)
+      let lang: Language | null = null
       if (stored) {
-        const lang = (migration[stored] ?? stored) as Language
-        if (valid.includes(lang)) {
-          setLanguageState(lang)
-          if (stored !== lang) localStorage.setItem(STORAGE_KEY, lang)
+        const migrated = (migration[stored] ?? stored) as Language
+        if (valid.includes(migrated)) {
+          lang = migrated
+          if (stored !== migrated) localStorage.setItem(STORAGE_KEY, migrated)
         }
       }
+      if (!lang && profile.language && valid.includes(profile.language)) {
+        lang = profile.language
+        localStorage.setItem(STORAGE_KEY, profile.language)
+      }
+      if (lang) setLanguageState(lang)
     } catch {
       // ignore
     }
@@ -54,6 +63,9 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       if (typeof document !== "undefined") {
         document.documentElement.lang = lang === "es-LA" ? "es" : lang.split("-")[0]
       }
+      // Sincronizar con perfil para que el idioma se guarde en el perfil del usuario
+      const profile = loadProfile()
+      saveProfile({ ...profile, language: lang })
     } catch {
       // ignore
     }
@@ -66,9 +78,9 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   }, [mounted, language])
 
   const value: LangContextType = {
-    language: mounted ? language : ("ca" as Language),
+    language: mounted ? language : DEFAULT_LANGUAGE,
     setLanguage,
-    t: t(mounted ? language : ("ca" as Language)),
+    t: t(mounted ? language : DEFAULT_LANGUAGE),
   }
 
   return <LangContext.Provider value={value}>{children}</LangContext.Provider>

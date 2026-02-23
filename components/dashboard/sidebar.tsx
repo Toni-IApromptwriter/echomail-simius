@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Mail, Settings, User, HelpCircle } from "lucide-react"
+import { Mail, Settings, User, HelpCircle, FolderOpen, Lock } from "lucide-react"
 import { SidebarLanguageSelector } from "./sidebar-language-selector"
 import { useLanguage } from "@/components/providers/language-provider"
 import { useSettings } from "@/components/providers/settings-provider"
+import { useSubscription } from "@/components/providers/subscription-provider"
 import { loadProfile } from "@/lib/profile"
+import { tierLabel } from "@/lib/subscription"
 
 interface DashboardSidebarProps {
   /** Si es true, se usa en modo overlay (mobile); si false, sidebar fijo en desktop */
@@ -18,6 +20,7 @@ interface DashboardSidebarProps {
 export function DashboardSidebar({ overlay = false, onNavClick }: DashboardSidebarProps) {
   const { t } = useLanguage()
   const { openSettings, openProfile } = useSettings()
+  const { tier, isPro, openProTrial } = useSubscription()
   const [profile, setProfile] = useState<ReturnType<typeof loadProfile> | null>(null)
 
   useEffect(() => {
@@ -38,22 +41,35 @@ export function DashboardSidebar({ overlay = false, onNavClick }: DashboardSideb
 
   return (
     <aside className={`${baseClass} flex`}>
-      <div className="flex h-16 items-center gap-3 border-b border-border px-6">
-        {profile?.photoBase64 ? (
-          <img
-            src={profile.photoBase64}
-            alt=""
-            className="h-9 w-9 shrink-0 rounded-full object-cover"
-          />
-        ) : profile?.logoBase64 ? (
-          <img
-            src={profile.logoBase64}
-            alt=""
-            className="h-8 w-10 shrink-0 object-contain"
-          />
-        ) : null}
-        <span className="truncate text-lg font-semibold text-foreground">
-          {profile?.name || profile?.brand || "EchoMail"}
+      <div className="flex h-16 flex-col justify-center gap-0.5 border-b border-border px-6">
+        <div className="flex items-center gap-3">
+          {profile?.photoBase64 ? (
+            <img
+              src={profile.photoBase64}
+              alt=""
+              className="h-9 w-9 shrink-0 rounded-full object-cover"
+            />
+          ) : profile?.logoBase64 ? (
+            <img
+              src={profile.logoBase64}
+              alt=""
+              className="h-8 w-10 shrink-0 object-contain"
+            />
+          ) : null}
+          <span className="truncate text-lg font-semibold text-foreground">
+            {profile?.name || profile?.brand || "EchoMail"}
+          </span>
+        </div>
+        <span
+          className={`truncate text-[10px] font-medium uppercase tracking-wider ${
+            tier === "ADMIN_LIFETIME"
+              ? "text-amber-500"
+              : tier === "PRO"
+                ? "text-primary"
+                : "text-muted-foreground"
+          }`}
+        >
+          {tierLabel(tier)}
         </span>
       </div>
       <nav className="flex flex-1 flex-col gap-1 p-4">
@@ -65,6 +81,26 @@ export function DashboardSidebar({ overlay = false, onNavClick }: DashboardSideb
           <Mail className="h-5 w-5" />
           {t.dashboard}
         </Link>
+        {isPro ? (
+          <Link
+            href="/catalogo"
+            onClick={onNavClick}
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <FolderOpen className="h-5 w-5" />
+            Catálogo
+          </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={handleNav(openProTrial)}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <Lock className="h-5 w-5 shrink-0" />
+            <span className="flex-1">Catálogo</span>
+            <span className="text-[10px] uppercase text-amber-500">PRO</span>
+          </button>
+        )}
         <button
           onClick={handleNav(openSettings)}
           className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"

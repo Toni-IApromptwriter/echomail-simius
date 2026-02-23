@@ -11,6 +11,16 @@ export type Language =
   | "zh-TW"
   | "ja"
 
+/** Idioma por defecto del sistema (Español de España) */
+export const DEFAULT_LANGUAGE: Language = "es"
+
+/** Idiomas ofrecidos en el onboarding (ES, CA, EN) */
+export const ONBOARDING_LANGUAGES: { code: Language; label: string }[] = [
+  { code: "es", label: "Español (ES)" },
+  { code: "ca", label: "Català (CA)" },
+  { code: "en-US", label: "English (EN)" },
+]
+
 export const LANGUAGES: { code: Language; label: string }[] = [
   { code: "ca", label: "Català" },
   { code: "pt", label: "Português" },
