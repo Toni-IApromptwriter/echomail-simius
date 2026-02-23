@@ -1,9 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Image from "next/image"
+import { LogOut } from "lucide-react"
 import { useLanguage } from "@/components/providers/language-provider"
 import { useSubscription } from "@/components/providers/subscription-provider"
 import { loadProfile, saveProfile } from "@/lib/profile"
+import { setTrialStartedAt } from "@/lib/trial"
 import { ONBOARDING_LANGUAGES, type Language } from "@/lib/i18n"
 import { isFounder } from "@/lib/subscription"
 
@@ -16,12 +19,16 @@ export function WelcomeModal({ isOpen, onComplete }: WelcomeModalProps) {
   const { language, setLanguage } = useLanguage()
   const { startProTrial } = useSubscription()
   const [profile, setProfile] = useState(loadProfile())
-  const [emailInput, setEmailInput] = useState("")
-
-  const isMaster = isFounder(profile.email) || isFounder(emailInput.trim())
+  const [phoneInput, setPhoneInput] = useState(profile.phone ?? "")
+  const [acceptTrial, setAcceptTrial] = useState(true)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
 
   useEffect(() => {
-    if (isOpen) setProfile(loadProfile())
+    if (isOpen) {
+      const p = loadProfile()
+      setProfile(p)
+      setPhoneInput(p.phone ?? "")
+    }
   }, [isOpen])
 
   const handleSelectLanguage = (lang: Language) => {
@@ -29,15 +36,38 @@ export function WelcomeModal({ isOpen, onComplete }: WelcomeModalProps) {
   }
 
   const handleConfirm = () => {
-    if (isMaster) {
-      if (emailInput.trim()) {
-        const p = loadProfile()
-        saveProfile({ ...p, email: emailInput.trim() })
+    const phone = phoneInput.trim()
+    if (!phone) {
+      alert("El teléfono es obligatorio para evitar el fraude de multicuentas.")
+      return
+    }
+    try {
+      const p = loadProfile()
+      saveProfile({
+        ...p,
+        phone,
+      })
+      if (acceptTrial && !isFounder(p.email)) {
+        setTrialStartedAt()
+        startProTrial()
       }
       onComplete()
-    } else {
-      startProTrial()
+    } catch {
       onComplete()
+    }
+  }
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true)
+    try {
+      await fetch("/api/auth/logout", { method: "POST" })
+      localStorage.removeItem("echomail-legal-consent")
+      localStorage.removeItem("echomail-marketing-consent")
+      window.location.href = "/"
+    } catch {
+      window.location.href = "/"
+    } finally {
+      setIsLoggingOut(false)
     }
   }
 
@@ -55,37 +85,39 @@ export function WelcomeModal({ isOpen, onComplete }: WelcomeModalProps) {
         aria-modal="true"
         aria-labelledby="welcome-modal-title"
       >
-        <div className="p-6">
+        <div className="relative p-6">
+          <button
+            type="button"
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+            className="absolute right-4 top-4 flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-70"
+            aria-label="Cerrar sesión"
+          >
+            <LogOut className="h-4 w-4" />
+            Cerrar sesión
+          </button>
+
+          <div className="mb-4 flex justify-center">
+            <Image
+              src="/logo-simius.jpg"
+              alt="Simius"
+              width={200}
+              height={200}
+              className="h-24 w-auto object-contain"
+            />
+          </div>
           <h2
             id="welcome-modal-title"
             className="mb-6 text-xl font-semibold text-foreground"
           >
-            Bienvenido a EchoMail. Vamos a configurar tu espacio de trabajo.
+            Bienvenido a EchoMail
           </h2>
 
-          <div className="mb-6">
-            <label
-              htmlFor="welcome-email"
-              className="mb-2 block text-sm font-medium text-muted-foreground"
-            >
-              Correo electrónico{" "}
-              <span className="text-muted-foreground/70">(opcional)</span>
-            </label>
-            <input
-              id="welcome-email"
-              type="email"
-              value={emailInput}
-              onChange={(e) => setEmailInput(e.target.value)}
-              placeholder="tu@email.com"
-              className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-          </div>
-
-          {/* Sección 1: Idioma */}
+          {/* 1. Idioma */}
           <section className="mb-6">
-            <h3 className="mb-3 text-sm font-medium text-foreground">
-              ¿En qué idioma prefieres la interfaz?
-            </h3>
+            <label className="mb-3 block text-sm font-medium text-foreground">
+              Idioma
+            </label>
             <div className="flex flex-col gap-2">
               {ONBOARDING_LANGUAGES.map((opt) => (
                 <button
@@ -104,53 +136,57 @@ export function WelcomeModal({ isOpen, onComplete }: WelcomeModalProps) {
             </div>
           </section>
 
-          {/* Secciones 2 y 3: Solo si no es Toni Mont */}
-          {!isMaster && (
-            <>
-              {/* Sección 2: Oferta Pro */}
-              <section className="mb-6">
-                <h3 className="mb-2 text-sm font-medium text-foreground">
-                  Disfruta de 15 días de acceso PRO gratis
-                </h3>
-                <ul className="space-y-1.5 text-sm text-muted-foreground">
-                  <li className="flex items-center gap-2">
-                    <span className="text-primary">✓</span>
-                    Identidades verbales ilimitadas
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="text-primary">✓</span>
-                    Módulo de catálogo
-                  </li>
-                </ul>
-              </section>
+          {/* 2. Teléfono (obligatorio) */}
+          <section className="mb-6">
+            <label
+              htmlFor="welcome-phone"
+              className="mb-2 block text-sm font-medium text-foreground"
+            >
+              Teléfono <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="welcome-phone"
+              type="tel"
+              value={phoneInput}
+              onChange={(e) => setPhoneInput(e.target.value)}
+              placeholder="+34 600 000 000"
+              required
+              className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Obligatorio para verificación y prevención de fraude.
+            </p>
+          </section>
 
-              {/* Sección 3: Transparencia */}
-              <section className="mb-6">
-                <p className="text-sm text-muted-foreground">
-                  Hoy pagas 0,00€. Te avisaremos 3 días antes de finalizar la
-                  prueba.
-                </p>
-              </section>
-            </>
-          )}
-
-          {isMaster && (
+          {/* 3. Aceptar Trial */}
+          {!isFounder(profile.email) && (
             <section className="mb-6">
-              <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-200">
-                Tienes acceso Maestro de por vida. Sin pasos de pago.
-              </p>
+              <label className="flex cursor-pointer items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={acceptTrial}
+                  onChange={(e) => setAcceptTrial(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                />
+                <span className="text-sm text-foreground">
+                  Tengo 5 días de prueba PRO gratis. Hoy no pago nada. Pasados los 5
+                  días tendré que suscribirme o configurar mi propia API Key de OpenAI
+                  para seguir usando la app. Te avisaremos 3 días antes de finalizar.
+                </span>
+              </label>
             </section>
           )}
 
-          {/* Botón principal */}
           <button
             type="button"
             onClick={handleConfirm}
             className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            {isMaster
-              ? "Acceso Maestro Activado"
-              : "Configurar idioma e iniciar prueba gratis"}
+            {isFounder(profile.email)
+              ? "Continuar"
+              : acceptTrial
+                ? "Aceptar e iniciar prueba gratis"
+                : "Continuar sin prueba"}
           </button>
         </div>
       </div>

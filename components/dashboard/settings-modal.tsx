@@ -133,6 +133,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const handleSaveOpenAIKey = () => {
     if (saveOpenAIKey(openAIKey.trim() || null)) {
       setOpenAIKeySaved(true)
+      window.dispatchEvent(new CustomEvent("openai-key-saved"))
       setTimeout(() => setOpenAIKeySaved(false), 2000)
     }
   }

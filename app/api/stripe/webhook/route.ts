@@ -1,10 +1,51 @@
 import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
+import path from "path"
+import fs from "fs"
+
+const SUBSCRIPTIONS_FILE = path.join(process.cwd(), ".data", "stripe-subscriptions.json")
+
+interface SubscriptionRecord {
+  subscription_id: string
+  customer_email: string | null
+  customer_id: string
+  status: string
+  activated_at: string
+}
+
+function ensureDataDir(): void {
+  const dir = path.dirname(SUBSCRIPTIONS_FILE)
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true })
+  }
+}
+
+function loadSubscriptions(): SubscriptionRecord[] {
+  try {
+    ensureDataDir()
+    if (!fs.existsSync(SUBSCRIPTIONS_FILE)) return []
+    const raw = fs.readFileSync(SUBSCRIPTIONS_FILE, "utf-8")
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function saveSubscription(record: SubscriptionRecord): void {
+  ensureDataDir()
+  const list = loadSubscriptions()
+  const existing = list.findIndex((r) => r.subscription_id === record.subscription_id)
+  const next = existing >= 0
+    ? list.map((r, i) => (i === existing ? record : r))
+    : [...list, record]
+  fs.writeFileSync(SUBSCRIPTIONS_FILE, JSON.stringify(next, null, 2), "utf-8")
+}
 
 /**
  * Webhook de Stripe para eventos de suscripción.
- * En una app sin BD, el cliente sigue verificando status vía /api/stripe/subscription-status.
- * Este webhook sirve para logging y futuras ampliaciones (ej. enviar email al cancelar).
+ * checkout.session.completed: activa la cuenta PRO del usuario.
+ * En app sin BD tradicional, persistimos en .data/stripe-subscriptions.json.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -33,10 +74,28 @@ export async function POST(request: NextRequest) {
     }
 
     switch (event.type) {
+      case "checkout.session.completed": {
+        const session = event.data.object as Stripe.Checkout.Session
+        const subId = session.subscription as string | null
+        const customerId = session.customer as string | null
+        const customerEmail = session.customer_email ?? session.customer_details?.email ?? null
+
+        if (subId && customerId) {
+          saveSubscription({
+            subscription_id: subId,
+            customer_email: customerEmail,
+            customer_id: typeof customerId === "string" ? customerId : "",
+            status: "active",
+            activated_at: new Date().toISOString(),
+          })
+          console.log("[Stripe Webhook] checkout.session.completed:", { subId, customerEmail })
+        }
+        break
+      }
       case "customer.subscription.updated":
       case "customer.subscription.deleted":
       case "customer.subscription.trial_will_end":
-        // Aquí podrías: enviar email, invalidar cache, etc.
+        // Futuro: actualizar estado en .data si hay BD
         break
       default:
         break

@@ -35,8 +35,23 @@ export async function GET(request: NextRequest) {
     }
 
     await exchangeCodeForTokens(code)
+    // Nota: No se obtienen userinfo (picture, email) de Google; el perfil se gestiona
+    // localmente. Si en el futuro se añade oauth2.userinfo, manejar picture como opcional
+    // (algunos usuarios no tienen foto) para evitar fallos en el flujo.
 
-    const successUrl = new URL("/", request.url)
+    let returnTo = "/"
+    try {
+      const payload = JSON.parse(
+        Buffer.from(savedState, "base64url").toString("utf8")
+      )
+      if (typeof payload?.r === "string" && payload.r.startsWith("/")) {
+        returnTo = payload.r
+      }
+    } catch {
+      // usar "/" si falla el parse
+    }
+
+    const successUrl = new URL(returnTo, request.url)
     successUrl.searchParams.set("google_connected", "1")
     return NextResponse.redirect(successUrl.toString())
   } catch (err) {

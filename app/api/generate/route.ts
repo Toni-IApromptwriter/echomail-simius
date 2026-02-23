@@ -35,15 +35,21 @@ const LENGTH_GUIDE: Record<string, string> = {
 function buildSystemPrompt(
   technique: string,
   length: string,
-  languageInstruction: string
+  languageInstruction: string,
+  companyContext?: string | null
 ): string {
   const techniqueGuide = TECHNIQUE_PROMPTS[technique] ?? TECHNIQUE_PROMPTS["Valor Lógico y Oferta Irresistible"]
   const lengthGuide = LENGTH_GUIDE[length] ?? LENGTH_GUIDE["Medio (Aprox. 300 palabras)"]
 
+  const contextBlock =
+    companyContext && companyContext.trim()
+      ? `\nCONTEXTO DE EMPRESA/CATÁLOGO (usa esta información para dar más relevancia y personalizar el email):\n${companyContext.trim()}\n`
+      : ""
+
   return `${MASTER_INSTRUCTION}
 
 ${languageInstruction}
-
+${contextBlock}
 Técnica aplicada: ${technique}
 Directrices de la técnica: ${techniqueGuide}
 
@@ -74,11 +80,13 @@ export async function POST(request: NextRequest) {
       technique,
       length,
       language = "es",
+      companyContext,
     } = body as {
       transcript?: string
       technique?: string
       length?: string
       language?: string
+      companyContext?: string | null
     }
 
     if (!transcript || typeof transcript !== "string") {
@@ -105,7 +113,8 @@ export async function POST(request: NextRequest) {
     const systemPrompt = buildSystemPrompt(
       technique || "Valor Lógico y Oferta Irresistible",
       length || "Medio (Aprox. 300 palabras)",
-      languageInstruction
+      languageInstruction,
+      companyContext
     )
 
     const openai = new OpenAI({ apiKey })

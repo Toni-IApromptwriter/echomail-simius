@@ -28,7 +28,7 @@ export function ProTrialGate({ feature }: ProTrialGateProps) {
         {feature} es una función PRO
       </h1>
       <p className="max-w-md text-center text-sm text-muted-foreground">
-        Prueba EchoMail Pro gratis durante 15 días para acceder a {feature} y
+        Prueba EchoMail Pro gratis durante 5 días para acceder a {feature} y
         todas las funciones premium.
       </p>
       <p className="text-xs text-muted-foreground">

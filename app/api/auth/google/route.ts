@@ -4,7 +4,12 @@ import crypto from "crypto"
 
 export async function GET(request: NextRequest) {
   try {
-    const state = crypto.randomBytes(24).toString("hex")
+    const { searchParams } = new URL(request.url)
+    const returnTo = searchParams.get("returnTo") ?? "/"
+    const nonce = crypto.randomBytes(24).toString("hex")
+    const state = Buffer.from(
+      JSON.stringify({ n: nonce, r: returnTo })
+    ).toString("base64url")
     await saveStateToCookie(state)
 
     const authUrl = getAuthUrl(state)

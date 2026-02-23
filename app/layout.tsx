@@ -5,6 +5,7 @@ import { LanguageProvider } from "@/components/providers/language-provider";
 import { SettingsProvider } from "@/components/providers/settings-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { SubscriptionProvider } from "@/components/providers/subscription-provider";
+import { ProfileProvider } from "@/components/providers/profile-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -59,7 +60,9 @@ export default function RootLayout({
         <ThemeProvider>
           <LanguageProvider>
             <SettingsProvider>
-              <SubscriptionProvider>{children}</SubscriptionProvider>
+              <SubscriptionProvider>
+              <ProfileProvider>{children}</ProfileProvider>
+            </SubscriptionProvider>
             </SettingsProvider>
           </LanguageProvider>
         </ThemeProvider>

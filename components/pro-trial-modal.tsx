@@ -68,7 +68,7 @@ export function ProTrialModal({
 
         <div className="space-y-5 px-6 py-6">
           <p className="text-sm leading-relaxed text-foreground">
-            Prueba EchoMail Pro gratis durante 15 días. Hoy pagas 0,00€. Te
+            Prueba EchoMail Pro gratis durante 5 días. Hoy pagas 0,00€. Te
             avisaremos 3 días antes de finalizar para tu total tranquilidad.
           </p>
           <ul className="space-y-2 text-sm text-muted-foreground">
@@ -99,11 +99,11 @@ export function ProTrialModal({
             {loading ? (
               <Loader2 className="h-5 w-5 animate-spin" />
             ) : (
-              "Iniciar mi prueba de 15 días"
+              "Iniciar mi prueba de 5 días"
             )}
           </button>
           <p className="text-xs text-center text-muted-foreground">
-            Si cancelas durante la prueba, mantienes acceso PRO hasta el final de los 15 días.
+            Si cancelas durante la prueba, mantienes acceso PRO hasta el final de los 5 días.
           </p>
         </div>
       </div>

@@ -20,9 +20,12 @@ import { ResultsSection } from "@/components/dashboard/results-section"
 import { HistorySidebar } from "@/components/dashboard/history-sidebar"
 import { SettingsModal } from "@/components/dashboard/settings-modal"
 import { ProfileModal } from "@/components/dashboard/profile-modal"
+import { TrialUrgencyBar } from "@/components/dashboard/trial-urgency-bar"
+import { ProfileSwitcher } from "@/components/dashboard/profile-switcher"
+import { ByokGate } from "@/components/dashboard/byok-gate"
 import { useLanguage } from "@/components/providers/language-provider"
 import { useSettings } from "@/components/providers/settings-provider"
-import { loadProfile } from "@/lib/profile"
+import { useProfile } from "@/components/providers/profile-provider"
 import { loadGoogleIntegrations, saveGoogleIntegrations } from "@/lib/google-integrations"
 import { loadOpenAIKey } from "@/lib/openai-settings"
 import { addToHistory } from "@/lib/history"
@@ -38,17 +41,8 @@ export default function DashboardPage() {
     openProfile,
     closeProfile,
   } = useSettings()
-  const [profileName, setProfileName] = useState("")
+  const { activeProfile } = useProfile()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-
-  useEffect(() => {
-    setProfileName(loadProfile().name || "")
-  }, [isProfileOpen])
-  useEffect(() => {
-    const onSaved = () => setProfileName(loadProfile().name || "")
-    window.addEventListener("profile-saved", onSaved)
-    return () => window.removeEventListener("profile-saved", onSaved)
-  }, [])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -112,6 +106,10 @@ export default function DashboardPage() {
       try {
         const genHeaders: Record<string, string> = { "Content-Type": "application/json" }
         if (openAIKey) genHeaders["X-OpenAI-API-Key"] = openAIKey
+        const companyContext =
+          activeProfile?.useCompanyContext && activeProfile?.companyContext?.trim()
+            ? activeProfile.companyContext
+            : null
         const generateRes = await fetch("/api/generate", {
           method: "POST",
           headers: genHeaders,
@@ -120,6 +118,7 @@ export default function DashboardPage() {
             technique: TECHNIQUE_KEY_TO_API[selectedTechnique],
             length: LENGTH_KEY_TO_API[selectedLength],
             language,
+            companyContext,
           }),
         })
 
@@ -189,22 +188,28 @@ export default function DashboardPage() {
       )}
 
       <main className="flex min-h-screen flex-1 flex-col pb-20 lg:pb-0">
-        <header className="flex items-center justify-between border-b border-border bg-card/60 px-4 py-4 backdrop-blur-sm sm:px-6 lg:px-10">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setMobileMenuOpen(true)}
-              className="rounded-lg p-2 text-foreground hover:bg-muted lg:hidden"
-              aria-label="Menú"
-            >
-              <Menu className="h-6 w-6" />
-            </button>
-            <div>
-              <h1 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
-                {t.greeting}{profileName ? `, ${profileName}` : ""}
-              </h1>
-              <p className="text-sm text-muted-foreground">{t.subtitle}</p>
+        <header className="flex flex-col gap-3 border-b border-border bg-card/60 px-4 py-4 backdrop-blur-sm sm:px-6 lg:px-10">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-1 items-center gap-3 min-w-0">
+              <button
+                onClick={() => setMobileMenuOpen(true)}
+                className="rounded-lg p-2 text-foreground hover:bg-muted lg:hidden"
+                aria-label="Menú"
+              >
+                <Menu className="h-6 w-6" />
+              </button>
+              <div>
+                <h1 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
+                  {t.greeting}{activeProfile?.name ? `, ${activeProfile.name}` : ""}
+                </h1>
+                <p className="text-sm text-muted-foreground">{t.subtitle}</p>
+              </div>
+            </div>
+            <div className="hidden sm:block shrink-0">
+              <ProfileSwitcher />
             </div>
           </div>
+          <TrialUrgencyBar />
         </header>
         <SettingsModal isOpen={isSettingsOpen} onClose={closeSettings} />
         <ProfileModal isOpen={isProfileOpen} onClose={closeProfile} />
@@ -212,17 +217,19 @@ export default function DashboardPage() {
         <div className="flex flex-1">
           <div className="flex flex-1 flex-col gap-10 overflow-y-auto px-5 py-8 sm:px-8 lg:px-12 lg:py-10">
             <section className="flex flex-col items-center gap-8 rounded-2xl border border-border bg-card px-6 py-10 shadow-sm sm:py-14">
-              <RecordButton
-                onRecordingComplete={handleRecordingComplete}
-                disabled={isLoadingTranscription || isLoadingEmail}
-                isProcessing={isLoadingTranscription || isLoadingEmail}
-              />
-              <CopywritingSelectors
-                technique={selectedTechnique}
-                length={selectedLength}
-                onTechniqueChange={setSelectedTechnique}
-                onLengthChange={setSelectedLength}
-              />
+              <ByokGate>
+                <RecordButton
+                  onRecordingComplete={handleRecordingComplete}
+                  disabled={isLoadingTranscription || isLoadingEmail}
+                  isProcessing={isLoadingTranscription || isLoadingEmail}
+                />
+                <CopywritingSelectors
+                  technique={selectedTechnique}
+                  length={selectedLength}
+                  onTechniqueChange={setSelectedTechnique}
+                  onLengthChange={setSelectedLength}
+                />
+              </ByokGate>
             </section>
 
             <ResultsSection

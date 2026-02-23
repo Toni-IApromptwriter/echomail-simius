@@ -7,6 +7,8 @@ export interface ProfileData {
   brand: string
   /** Email del usuario (para bypass fundador hola@tonimont.com) */
   email: string
+  /** Teléfono (obligatorio en onboarding; antifraude multicuentas) */
+  phone: string
   photoBase64: string | null
   logoBase64: string | null
   verbalIdentityDocs: (string | null)[] // base64 content of up to 3 docs
@@ -18,6 +20,7 @@ const DEFAULT: ProfileData = {
   name: "",
   brand: "",
   email: "",
+  phone: "",
   photoBase64: null,
   logoBase64: null,
   verbalIdentityDocs: [null, null, null],
@@ -35,6 +38,7 @@ export function loadProfile(): ProfileData {
       name: parsed.name ?? DEFAULT.name,
       brand: parsed.brand ?? DEFAULT.brand,
       email: typeof parsed.email === "string" ? parsed.email : DEFAULT.email,
+      phone: typeof parsed.phone === "string" ? parsed.phone : DEFAULT.phone,
       photoBase64: parsed.photoBase64 ?? DEFAULT.photoBase64,
       logoBase64: parsed.logoBase64 ?? DEFAULT.logoBase64,
       verbalIdentityDocs: Array.isArray(parsed.verbalIdentityDocs)

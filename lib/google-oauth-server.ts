@@ -8,6 +8,7 @@ import { cookies } from "next/headers"
 import path from "path"
 import fs from "fs"
 
+// Deben coincidir con los Scopes habilitados en Google Cloud Console
 const SCOPES = [
   "https://www.googleapis.com/auth/calendar.readonly",
   "https://www.googleapis.com/auth/calendar.events",
@@ -28,11 +29,15 @@ const COOKIE_NAME = "echomail_google_oauth_state"
 function getOAuth2Client() {
   const clientId = process.env.GOOGLE_CLIENT_ID
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI
+  // En producción: usa GOOGLE_REDIRECT_URI o deriva de NEXT_PUBLIC_APP_URL
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL
+  const redirectUri =
+    process.env.GOOGLE_REDIRECT_URI ||
+    (baseUrl ? `${baseUrl.replace(/\/$/, "")}/api/auth/google/callback` : undefined)
 
   if (!clientId || !clientSecret || !redirectUri) {
     throw new Error(
-      "GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET y GOOGLE_REDIRECT_URI deben estar en .env.local"
+      "GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET y GOOGLE_REDIRECT_URI (o NEXT_PUBLIC_APP_URL) deben estar configurados"
     )
   }
 

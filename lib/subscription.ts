@@ -43,6 +43,16 @@ export function maxVerbalIdentities(tier: Tier): number {
 }
 
 /**
+ * Límite de perfiles/identidades según tier.
+ * BASIC: 1 | PRO: 3 | ADMIN_LIFETIME (Enterprise): 5
+ */
+export function maxProfiles(tier: Tier): number {
+  if (tier === "ADMIN_LIFETIME") return 5
+  if (tier === "PRO") return 3
+  return 1
+}
+
+/**
  * Carga el tier almacenado (BASIC o PRO).
  */
 export function loadStoredTier(): Tier | null {

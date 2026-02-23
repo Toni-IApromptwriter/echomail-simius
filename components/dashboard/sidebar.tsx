@@ -2,14 +2,16 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Mail, Settings, User, HelpCircle, FolderOpen, Lock, LogOut } from "lucide-react"
+import { Mail, Settings, User, HelpCircle, FolderOpen, Lock, LogOut, Plug2, MessageSquare, Sparkles } from "lucide-react"
 import { SidebarLanguageSelector } from "./sidebar-language-selector"
 import { useLanguage } from "@/components/providers/language-provider"
 import { useSettings } from "@/components/providers/settings-provider"
 import { useSubscription } from "@/components/providers/subscription-provider"
-import { loadProfile } from "@/lib/profile"
+import { useProfile } from "@/components/providers/profile-provider"
 import { tierLabel } from "@/lib/subscription"
+import { getProfileColorHex } from "@/lib/profiles"
 import { saveGoogleIntegrations } from "@/lib/google-integrations"
+import { FeedbackModal } from "@/components/feedback-modal"
 
 interface DashboardSidebarProps {
   /** Si es true, se usa en modo overlay (mobile); si false, sidebar fijo en desktop */
@@ -21,27 +23,17 @@ interface DashboardSidebarProps {
 export function DashboardSidebar({ overlay = false, onNavClick }: DashboardSidebarProps) {
   const { t } = useLanguage()
   const { openSettings, openProfile } = useSettings()
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
   const { tier, isPro, openProTrial } = useSubscription()
-  const [profile, setProfile] = useState<ReturnType<typeof loadProfile> | null>(null)
-
-  useEffect(() => {
-    const refresh = () => setProfile(loadProfile())
-    refresh()
-    window.addEventListener("profile-saved", refresh)
-    return () => window.removeEventListener("profile-saved", refresh)
-  }, [])
+  const { activeProfile } = useProfile()
 
   const handleNav = (fn?: () => void) => () => {
     onNavClick?.()
     fn?.()
   }
 
-  const handleLogout = async () => {
-    try {
-      await fetch("/api/auth/logout", { method: "POST" })
-    } catch {
-      // ignore
-    }
+  const handleLogout = () => {
+    // Limpiar sesión y estado local primero
     saveGoogleIntegrations({
       googleConnected: false,
       driveSyncEnabled: false,
@@ -50,8 +42,18 @@ export function DashboardSidebar({ overlay = false, onNavClick }: DashboardSideb
     })
     localStorage.removeItem("echomail-profile")
     localStorage.removeItem("echomail-onboarding-language-done")
+    localStorage.removeItem("echomail-legal-consent")
+    localStorage.removeItem("echomail-marketing-consent")
+    localStorage.removeItem("echomail-subscription-tier")
+    localStorage.removeItem("echomail-stripe-subscription-id")
+    localStorage.removeItem("echomail-trial-started-at")
+    localStorage.removeItem("echomail-profiles")
+    localStorage.removeItem("echomail-active-profile-id")
     window.dispatchEvent(new CustomEvent("google-integrations-changed"))
-    window.location.href = "/"
+    // API en background (no bloquear la redirección)
+    fetch("/api/auth/logout", { method: "POST" }).catch(() => {})
+    // Redirigir a / de inmediato (replace evita volver atrás al dashboard)
+    window.location.replace("/")
   }
 
   const baseClass = overlay
@@ -62,21 +64,30 @@ export function DashboardSidebar({ overlay = false, onNavClick }: DashboardSideb
     <aside className={`${baseClass} flex`}>
       <div className="flex h-16 flex-col justify-center gap-0.5 border-b border-border px-6">
         <div className="flex items-center gap-3">
-          {profile?.photoBase64 ? (
+          {activeProfile?.photoBase64 ? (
             <img
-              src={profile.photoBase64}
+              src={activeProfile.photoBase64}
               alt=""
               className="h-9 w-9 shrink-0 rounded-full object-cover"
             />
-          ) : profile?.logoBase64 ? (
+          ) : activeProfile?.logoBase64 ? (
             <img
-              src={profile.logoBase64}
+              src={activeProfile.logoBase64}
               alt=""
               className="h-8 w-10 shrink-0 object-contain"
             />
-          ) : null}
+          ) : (
+            <span
+              className="h-9 w-9 shrink-0 rounded-full"
+              style={{
+                backgroundColor: activeProfile
+                  ? getProfileColorHex(activeProfile.color)
+                  : "#3B82F6",
+              }}
+            />
+          )}
           <span className="truncate text-lg font-semibold text-foreground">
-            {profile?.name || profile?.brand || "EchoMail"}
+            {activeProfile?.name || activeProfile?.brand || "EchoMail"}
           </span>
         </div>
         <span
@@ -120,6 +131,22 @@ export function DashboardSidebar({ overlay = false, onNavClick }: DashboardSideb
             <span className="text-[10px] uppercase text-amber-500">PRO</span>
           </button>
         )}
+        <Link
+          href="/integraciones"
+          onClick={onNavClick}
+          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <Plug2 className="h-5 w-5" />
+          Integraciones
+        </Link>
+        <Link
+          href="/upgrade"
+          onClick={onNavClick}
+          className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/10"
+        >
+          <Sparkles className="h-5 w-5" />
+          Ver planes
+        </Link>
         <button
           onClick={handleNav(openSettings)}
           className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -183,9 +210,18 @@ export function DashboardSidebar({ overlay = false, onNavClick }: DashboardSideb
             >
               Política de Cookies
             </a>
+            <button
+              type="button"
+              onClick={handleNav(() => setFeedbackOpen(true))}
+              className="mt-2 flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:text-foreground hover:underline"
+            >
+              <MessageSquare className="h-3.5 w-3.5" />
+              Feedback
+            </button>
           </div>
         </div>
       </nav>
+      <FeedbackModal isOpen={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
     </aside>
   )
 }
