@@ -23,6 +23,8 @@ import { ProfileModal } from "@/components/dashboard/profile-modal"
 import { useLanguage } from "@/components/providers/language-provider"
 import { useSettings } from "@/components/providers/settings-provider"
 import { loadProfile } from "@/lib/profile"
+import { loadGoogleIntegrations, saveGoogleIntegrations } from "@/lib/google-integrations"
+import { loadOpenAIKey } from "@/lib/openai-settings"
 import { addToHistory } from "@/lib/history"
 import type { HistoryEntry } from "@/lib/history"
 
@@ -46,6 +48,14 @@ export default function DashboardPage() {
     const onSaved = () => setProfileName(loadProfile().name || "")
     window.addEventListener("profile-saved", onSaved)
     return () => window.removeEventListener("profile-saved", onSaved)
+  }, [])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get("google_connected") === "1") {
+      saveGoogleIntegrations({ googleConnected: true })
+      window.history.replaceState({}, "", window.location.pathname)
+    }
   }, [])
 
   const [selectedTechnique, setSelectedTechnique] =
@@ -79,9 +89,13 @@ export default function DashboardPage() {
     try {
       const formData = new FormData()
       formData.append("audio", audioBlob, "recording.webm")
+      const openAIKey = loadOpenAIKey()
+      const transcribeHeaders: Record<string, string> = {}
+      if (openAIKey) transcribeHeaders["X-OpenAI-API-Key"] = openAIKey
 
       const transcribeRes = await fetch("/api/transcribe", {
         method: "POST",
+        headers: transcribeHeaders,
         body: formData,
       })
 
@@ -96,9 +110,11 @@ export default function DashboardPage() {
       setIsLoadingEmail(true)
 
       try {
+        const genHeaders: Record<string, string> = { "Content-Type": "application/json" }
+        if (openAIKey) genHeaders["X-OpenAI-API-Key"] = openAIKey
         const generateRes = await fetch("/api/generate", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: genHeaders,
           body: JSON.stringify({
             transcript: text,
             technique: TECHNIQUE_KEY_TO_API[selectedTechnique],
@@ -122,6 +138,19 @@ export default function DashboardPage() {
           email,
         })
         setHistoryRefreshTrigger((prev) => prev + 1)
+
+        const integrations = loadGoogleIntegrations()
+        if (integrations.driveSyncEnabled && integrations.googleConnected) {
+          try {
+            await fetch("/api/google/drive/save", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email, transcription: text }),
+            })
+          } catch (driveErr) {
+            console.warn("No se pudo sincronizar con Drive:", driveErr)
+          }
+        }
       } catch (genErr) {
         console.error(genErr)
         setGeneratedEmail(null)

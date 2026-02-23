@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Mail, Settings, User, HelpCircle, FolderOpen, Lock } from "lucide-react"
+import { Mail, Settings, User, HelpCircle, FolderOpen, Lock, LogOut } from "lucide-react"
 import { SidebarLanguageSelector } from "./sidebar-language-selector"
 import { useLanguage } from "@/components/providers/language-provider"
 import { useSettings } from "@/components/providers/settings-provider"
 import { useSubscription } from "@/components/providers/subscription-provider"
 import { loadProfile } from "@/lib/profile"
 import { tierLabel } from "@/lib/subscription"
+import { saveGoogleIntegrations } from "@/lib/google-integrations"
 
 interface DashboardSidebarProps {
   /** Si es true, se usa en modo overlay (mobile); si false, sidebar fijo en desktop */
@@ -33,6 +34,24 @@ export function DashboardSidebar({ overlay = false, onNavClick }: DashboardSideb
   const handleNav = (fn?: () => void) => () => {
     onNavClick?.()
     fn?.()
+  }
+
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" })
+    } catch {
+      // ignore
+    }
+    saveGoogleIntegrations({
+      googleConnected: false,
+      driveSyncEnabled: false,
+      calendarId: null,
+      calendarName: null,
+    })
+    localStorage.removeItem("echomail-profile")
+    localStorage.removeItem("echomail-onboarding-language-done")
+    window.dispatchEvent(new CustomEvent("google-integrations-changed"))
+    window.location.href = "/"
   }
 
   const baseClass = overlay
@@ -114,6 +133,13 @@ export function DashboardSidebar({ overlay = false, onNavClick }: DashboardSideb
         >
           <User className="h-5 w-5" />
           {t.profile}
+        </button>
+        <button
+          onClick={handleNav(handleLogout)}
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <LogOut className="h-5 w-5" />
+          {t.logout}
         </button>
         <SidebarLanguageSelector />
         <Link

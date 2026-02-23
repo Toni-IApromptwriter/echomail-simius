@@ -16,6 +16,10 @@ import {
   saveTier,
   canAccessPro,
 } from "@/lib/subscription"
+import {
+  loadStripeSubscriptionId,
+  saveStripeSubscriptionId,
+} from "@/lib/stripe-client"
 import { ProTrialModal } from "@/components/pro-trial-modal"
 
 type SubscriptionContextType = {
@@ -35,12 +39,61 @@ function refreshTier(): Tier {
   return getEffectiveTier(profile.email, stored)
 }
 
+/**
+ * Pase Maestro: hola@tonimont.com tiene ADMIN_LIFETIME y acceso total sin Stripe.
+ * Ver lib/subscription.ts isFounder()
+ */
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const [tier, setTier] = useState<Tier>("BASIC")
+  const [stripePro, setStripePro] = useState(false)
   const [isProTrialOpen, setIsProTrialOpen] = useState(false)
 
   useEffect(() => {
     setTier(refreshTier())
+  }, [])
+
+  // Verificar Stripe status si tenemos subscription_id
+  useEffect(() => {
+    const subId = loadStripeSubscriptionId()
+    if (!subId) {
+      setStripePro(false)
+      return
+    }
+    fetch("/api/stripe/subscription-status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subscription_id: subId }),
+    })
+      .then((res) => res.json())
+      .then((data) => setStripePro(Boolean(data.isPro)))
+      .catch(() => setStripePro(false))
+  }, [tier])
+
+  // Handle redirect tras Stripe Checkout success
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const sessionId = params.get("session_id")
+    const success = params.get("stripe_success") === "1"
+    if (!success || !sessionId) return
+
+    fetch("/api/stripe/verify-session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sessionId }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.subscription_id) {
+          saveStripeSubscriptionId(data.subscription_id)
+          setStripePro(Boolean(data.isPro))
+          setTier(refreshTier())
+          window.dispatchEvent(new CustomEvent("subscription-updated"))
+        }
+      })
+      .catch(console.error)
+      .finally(() => {
+        window.history.replaceState({}, "", window.location.pathname)
+      })
   }, [])
 
   useEffect(() => {
@@ -64,7 +117,8 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     }
   }, [closeProTrial])
 
-  const isPro = canAccessPro(tier)
+  const effectiveTier = tier
+  const isPro = canAccessPro(effectiveTier) || stripePro
 
   return (
     <SubscriptionContext.Provider

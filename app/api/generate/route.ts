@@ -57,10 +57,13 @@ FORMATO OBLIGATORIO: Devuelve el email en Markdown. Usa **negritas** en las fras
 
 export async function POST(request: NextRequest) {
   try {
-    const apiKey = process.env.OPENAI_API_KEY
+    // Prioridad: header del usuario > variable de entorno
+    const userKey = request.headers.get("x-openai-api-key")
+    const envKey = process.env.OPENAI_API_KEY
+    const apiKey = userKey?.trim() || envKey
     if (!apiKey) {
       return NextResponse.json(
-        { error: "OPENAI_API_KEY no está configurada en .env.local" },
+        { error: "OPENAI_API_KEY no está configurada. Usa Configuración para introducir tu clave o configura .env.local." },
         { status: 500 }
       )
     }
