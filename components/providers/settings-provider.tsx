@@ -12,18 +12,37 @@ type SettingsContextType = {
   isSettingsOpen: boolean
   openSettings: () => void
   closeSettings: () => void
+  isProfileOpen: boolean
+  openProfile: () => void
+  closeProfile: () => void
 }
 
 const SettingsContext = createContext<SettingsContextType | null>(null)
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const openSettings = useCallback(() => setIsSettingsOpen(true), [])
+  const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const openSettings = useCallback(() => {
+    setIsProfileOpen(false)
+    setIsSettingsOpen(true)
+  }, [])
   const closeSettings = useCallback(() => setIsSettingsOpen(false), [])
+  const openProfile = useCallback(() => {
+    setIsSettingsOpen(false)
+    setIsProfileOpen(true)
+  }, [])
+  const closeProfile = useCallback(() => setIsProfileOpen(false), [])
 
   return (
     <SettingsContext.Provider
-      value={{ isSettingsOpen, openSettings, closeSettings }}
+      value={{
+        isSettingsOpen,
+        openSettings,
+        closeSettings,
+        isProfileOpen,
+        openProfile,
+        closeProfile,
+      }}
     >
       {children}
     </SettingsContext.Provider>

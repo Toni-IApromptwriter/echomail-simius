@@ -12,7 +12,7 @@ export function LanguageSelector() {
   const current = LANGUAGES.find((l) => l.code === language) ?? LANGUAGES[0]
 
   return (
-    <div className="relative">
+    <div className="relative z-[9999]">
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground hover:bg-muted/50"
@@ -29,12 +29,12 @@ export function LanguageSelector() {
       {isOpen && (
         <>
           <div
-            className="fixed inset-0 z-10"
+            className="fixed inset-0 z-[9998]"
             onClick={() => setIsOpen(false)}
             aria-hidden="true"
           />
           <ul
-            className="absolute right-0 top-full z-20 mt-1 min-w-[140px] rounded-lg border border-border bg-card py-1 shadow-lg"
+            className="absolute right-0 top-full z-[9999] mt-1 min-w-[140px] rounded-lg border border-border bg-card py-1 shadow-lg"
             role="listbox"
           >
             {LANGUAGES.map((opt) => (

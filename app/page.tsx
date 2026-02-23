@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useCallback } from "react"
-import { Globe } from "lucide-react"
+import { useState, useCallback, useEffect } from "react"
+import { Menu } from "lucide-react"
+import { ConsentGate } from "@/components/consent-gate"
 import { DashboardSidebar } from "@/components/dashboard/sidebar"
 import { RecordButton } from "@/components/dashboard/record-button"
 import {
@@ -18,14 +19,35 @@ import {
 import { ResultsSection } from "@/components/dashboard/results-section"
 import { HistorySidebar } from "@/components/dashboard/history-sidebar"
 import { SettingsModal } from "@/components/dashboard/settings-modal"
+import { ProfileModal } from "@/components/dashboard/profile-modal"
 import { useLanguage } from "@/components/providers/language-provider"
 import { useSettings } from "@/components/providers/settings-provider"
+import { loadProfile } from "@/lib/profile"
 import { addToHistory } from "@/lib/history"
 import type { HistoryEntry } from "@/lib/history"
 
 export default function DashboardPage() {
   const { t, language } = useLanguage()
-  const { isSettingsOpen, openSettings, closeSettings } = useSettings()
+  const {
+    isSettingsOpen,
+    openSettings,
+    closeSettings,
+    isProfileOpen,
+    openProfile,
+    closeProfile,
+  } = useSettings()
+  const [profileName, setProfileName] = useState("")
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  useEffect(() => {
+    setProfileName(loadProfile().name || "")
+  }, [isProfileOpen])
+  useEffect(() => {
+    const onSaved = () => setProfileName(loadProfile().name || "")
+    window.addEventListener("profile-saved", onSaved)
+    return () => window.removeEventListener("profile-saved", onSaved)
+  }, [])
+
   const [selectedTechnique, setSelectedTechnique] =
     useState<TechniqueKey>(TECHNIQUE_KEYS[0])
   const [selectedLength, setSelectedLength] = useState<LengthKey>(LENGTH_KEYS[0])
@@ -121,27 +143,42 @@ export default function DashboardPage() {
   }
 
   return (
+    <ConsentGate>
     <div className="flex min-h-screen bg-background">
       <DashboardSidebar />
-
-      <main className="flex flex-1 flex-col">
-        <header className="flex items-center justify-between border-b border-border bg-card/60 px-6 py-4 backdrop-blur-sm lg:px-10">
-          <div className="pl-10 lg:pl-0">
-            <h1 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
-              {t.greeting}, Ana
-            </h1>
-            <p className="text-sm text-muted-foreground">{t.subtitle}</p>
+      {mobileMenuOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-30 bg-black/40 lg:hidden"
+            onClick={() => setMobileMenuOpen(false)}
+            aria-hidden
+          />
+          <div className="fixed inset-y-0 left-0 z-40 lg:hidden">
+            <DashboardSidebar overlay onNavClick={() => setMobileMenuOpen(false)} />
           </div>
-          <button
-            onClick={openSettings}
-            className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground hover:bg-muted/50"
-            aria-label={t.settings}
-          >
-            <span className="hidden sm:inline">{t.language}</span>
-            <Globe className="h-4 w-4 text-muted-foreground" />
-          </button>
+        </>
+      )}
+
+      <main className="flex min-h-screen flex-1 flex-col pb-20 lg:pb-0">
+        <header className="flex items-center justify-between border-b border-border bg-card/60 px-4 py-4 backdrop-blur-sm sm:px-6 lg:px-10">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setMobileMenuOpen(true)}
+              className="rounded-lg p-2 text-foreground hover:bg-muted lg:hidden"
+              aria-label="Menú"
+            >
+              <Menu className="h-6 w-6" />
+            </button>
+            <div>
+              <h1 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
+                {t.greeting}{profileName ? `, ${profileName}` : ""}
+              </h1>
+              <p className="text-sm text-muted-foreground">{t.subtitle}</p>
+            </div>
+          </div>
         </header>
         <SettingsModal isOpen={isSettingsOpen} onClose={closeSettings} />
+        <ProfileModal isOpen={isProfileOpen} onClose={closeProfile} />
 
         <div className="flex flex-1">
           <div className="flex flex-1 flex-col gap-10 overflow-y-auto px-5 py-8 sm:px-8 lg:px-12 lg:py-10">
@@ -178,7 +215,47 @@ export default function DashboardPage() {
             }}
           />
         </div>
+
+        {/* Barra inferior móvil */}
+        <nav className="fixed bottom-0 left-0 right-0 z-20 flex items-center justify-around border-t border-border bg-card/95 py-2 backdrop-blur-sm lg:hidden">
+          <button
+            onClick={() => setMobileMenuOpen(true)}
+            className="flex flex-col items-center gap-1 rounded-lg px-4 py-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <Menu className="h-5 w-5" />
+            <span className="text-xs">{t.dashboard}</span>
+          </button>
+          <button
+            onClick={openSettings}
+            className="flex flex-col items-center gap-1 rounded-lg px-4 py-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span className="text-xs">{t.settings}</span>
+          </button>
+          <button
+            onClick={openProfile}
+            className="flex flex-col items-center gap-1 rounded-lg px-4 py-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            <span className="text-xs">{t.profile}</span>
+          </button>
+          <a
+            href="/help"
+            className="flex flex-col items-center gap-1 rounded-lg px-4 py-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="text-xs">{t.help}</span>
+          </a>
+        </nav>
       </main>
     </div>
+    </ConsentGate>
   )
 }

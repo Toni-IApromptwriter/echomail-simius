@@ -28,7 +28,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY)
-      const valid: Language[] = ["ca", "pt", "es", "es-LA", "en-US", "en-GB", "fr", "de"]
+      const valid: Language[] = ["ca", "pt", "es", "es-LA", "en-US", "en-GB", "fr", "de", "zh-CN", "zh-TW", "ja"]
       const migration: Record<string, Language> = {
         en: "en-US",
         fr: "fr",
