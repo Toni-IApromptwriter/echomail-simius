@@ -1,16 +1,18 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
-import { ChevronLeft, Menu } from "lucide-react"
+import { ChevronLeft, Menu, HardDrive, Calendar } from "lucide-react"
 import { ConsentGate } from "@/components/consent-gate"
 import { DashboardSidebar } from "@/components/dashboard/sidebar"
 import {
   loadGoogleIntegrations,
   saveGoogleIntegrations,
+  type GoogleIntegrationsData,
 } from "@/lib/google-integrations"
 import { IntegrationCard } from "@/components/integrations/integration-card"
 import { INTEGRATIONS_CONFIG } from "@/lib/integrations-config"
+import { useLanguage } from "@/components/providers/language-provider"
 
 const FALLBACK_LOGOS: Record<string, React.ReactNode> = {
   "google-drive": (
@@ -41,22 +43,42 @@ const FALLBACK_LOGOS: Record<string, React.ReactNode> = {
 }
 
 export default function IntegracionesPage() {
+  const { t } = useLanguage()
   const [googleConnected, setGoogleConnected] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [integrations, setIntegrations] = useState<GoogleIntegrationsData>(
+    () => loadGoogleIntegrations()
+  )
+  const [calendars, setCalendars] = useState<{ id: string; summary: string }[]>([])
+  const [loadingCalendars, setLoadingCalendars] = useState(false)
 
-  const refreshStatus = async () => {
+  const refreshStatus = useCallback(async () => {
     try {
       const res = await fetch("/api/google/status")
       const { connected } = await res.json()
       setGoogleConnected(Boolean(connected))
+      setIntegrations(loadGoogleIntegrations())
+      if (connected) {
+        setLoadingCalendars(true)
+        const calRes = await fetch("/api/google/calendar/list")
+        if (calRes.ok) {
+          const { calendars: list } = await calRes.json()
+          setCalendars(list ?? [])
+        }
+      } else {
+        setCalendars([])
+      }
     } catch {
       setGoogleConnected(false)
+      setCalendars([])
+    } finally {
+      setLoadingCalendars(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     refreshStatus()
-  }, [])
+  }, [refreshStatus])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -65,10 +87,12 @@ export default function IntegracionesPage() {
       refreshStatus()
       window.history.replaceState({}, "", "/integraciones")
     }
-  }, [])
+  }, [refreshStatus])
 
   useEffect(() => {
-    const onChanged = () => refreshStatus()
+    const onChanged = () => {
+      setIntegrations(loadGoogleIntegrations())
+    }
     window.addEventListener("google-integrations-changed", onChanged)
     return () =>
       window.removeEventListener("google-integrations-changed", onChanged)
@@ -76,6 +100,23 @@ export default function IntegracionesPage() {
 
   const handleConnectGoogle = () => {
     window.location.href = "/api/auth/google?returnTo=/integraciones"
+  }
+
+  const handleDriveSyncToggle = () => {
+    const next = !integrations.driveSyncEnabled
+    if (next && !googleConnected) {
+      handleConnectGoogle()
+      return
+    }
+    saveGoogleIntegrations({ driveSyncEnabled: next })
+    setIntegrations((p) => ({ ...p, driveSyncEnabled: next }))
+    window.dispatchEvent(new CustomEvent("google-integrations-changed"))
+  }
+
+  const handleCalendarSelect = (id: string, summary: string) => {
+    saveGoogleIntegrations({ calendarId: id, calendarName: summary })
+    setIntegrations((p) => ({ ...p, calendarId: id, calendarName: summary }))
+    window.dispatchEvent(new CustomEvent("google-integrations-changed"))
   }
 
   return (
@@ -146,6 +187,79 @@ export default function IntegracionesPage() {
             />
           ))}
         </div>
+
+        {googleConnected && (
+          <section className="mt-10 rounded-2xl border border-[#262626] bg-[#171717]/80 p-6">
+            <h2 className="mb-4 text-base font-semibold tracking-tight text-[#ededed]">
+              Configuración de Google
+            </h2>
+            <div className="space-y-6">
+              <div>
+                <label className="mb-2 flex items-center gap-2 text-sm font-medium text-[#ededed]">
+                  <HardDrive className="h-4 w-4" />
+                  {t.connectGoogleDrive}
+                </label>
+                <div className="flex items-center justify-between rounded-lg border border-[#262626] bg-[#0a0a0a]/50 px-4 py-3">
+                  <span className="text-sm text-[#a3a3a3]">
+                    {t.driveSyncEnabled}
+                  </span>
+                  <button
+                    role="switch"
+                    aria-checked={integrations.driveSyncEnabled}
+                    onClick={handleDriveSyncToggle}
+                    className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                      integrations.driveSyncEnabled ? "bg-[#facc15]" : "bg-[#262626]"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                        integrations.driveSyncEnabled ? "left-6" : "left-1"
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="mb-2 flex items-center gap-2 text-sm font-medium text-[#ededed]">
+                  <Calendar className="h-4 w-4" />
+                  {t.connectGoogleCalendar}
+                </label>
+                <div className="rounded-lg border border-[#262626] bg-[#0a0a0a]/50 px-4 py-3">
+                  <p className="mb-2 text-xs font-medium text-[#a3a3a3]">
+                    {t.calendarController}
+                  </p>
+                  {loadingCalendars ? (
+                    <p className="text-sm text-[#a3a3a3]">Cargando…</p>
+                  ) : calendars.length > 0 ? (
+                    <select
+                      value={integrations.calendarId ?? ""}
+                      onChange={(e) => {
+                        const opt = e.target.selectedOptions[0]
+                        handleCalendarSelect(
+                          e.target.value,
+                          opt?.textContent ?? ""
+                        )
+                      }}
+                      className="w-full rounded-lg border border-[#262626] bg-[#0a0a0a] px-3 py-2 text-sm text-[#ededed]"
+                    >
+                      <option value="">{t.selectCalendar}</option>
+                      {calendars.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.summary}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="text-sm text-[#a3a3a3]">No hay calendarios</p>
+                  )}
+                  <p className="mt-2 text-xs text-[#737373]">
+                    Los eventos con etiqueta [EchoMail] programan el envío.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
       </main>
       </div>
     </div>
