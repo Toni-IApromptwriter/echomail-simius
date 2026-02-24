@@ -103,6 +103,7 @@ export function DashboardSidebar({ overlay = false, onNavClick }: DashboardSideb
         </span>
       </div>
       <nav className="flex flex-1 flex-col gap-1 p-4">
+        {/* Arriba: Dashboard y Catálogo (uso principal) */}
         <Link
           href="/"
           onClick={onNavClick}
@@ -131,6 +132,8 @@ export function DashboardSidebar({ overlay = false, onNavClick }: DashboardSideb
             <span className="text-[10px] uppercase text-amber-500">PRO</span>
           </button>
         )}
+
+        {/* Medio: Configuración e Integraciones */}
         <Link
           href="/integraciones"
           onClick={onNavClick}
@@ -161,13 +164,7 @@ export function DashboardSidebar({ overlay = false, onNavClick }: DashboardSideb
           <User className="h-5 w-5" />
           {t.profile}
         </button>
-        <button
-          onClick={handleNav(handleLogout)}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          <LogOut className="h-5 w-5" />
-          {t.logout}
-        </button>
+
         <SidebarLanguageSelector />
         <Link
           href="/help"
@@ -219,6 +216,17 @@ export function DashboardSidebar({ overlay = false, onNavClick }: DashboardSideb
               Feedback
             </button>
           </div>
+        </div>
+
+        {/* Abajo: Cerrar sesión, bien separado */}
+        <div className="mt-6 border-t border-border pt-4">
+          <button
+            onClick={handleNav(handleLogout)}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <LogOut className="h-5 w-5" />
+            {t.logout}
+          </button>
         </div>
       </nav>
       <FeedbackModal isOpen={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
